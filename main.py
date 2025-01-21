@@ -82,7 +82,7 @@ def load_levels(filename):
 
 
 levels = load_levels("resources/levels.txt")
-current_level = 0
+current_level = 1
 
 # Draw level
 def draw_level(level, fireboy, watergirl, cube, diamonds):
@@ -163,7 +163,7 @@ class Player:
         self.on_ground = False  # To check if player is on the ground or platform
         self.score = 0
 
-    def move(self, level, other_player, cube, diamonds):
+    def move(self, level, cube, diamonds):
         """Apply movement and collisions."""
         self.rect.x += self.dx  # Apply horizontal movement
 
@@ -179,24 +179,31 @@ class Player:
         # Check for horizontal collisions with all tiles
         for row_index, row in enumerate(level):
             for col_index, tile in enumerate(row):
+                tile_rect = pygame.Rect(col_index * TILE_SIZE, row_index * TILE_SIZE, TILE_SIZE, TILE_SIZE)
                 if tile == "#":  # Solid tile
-                    tile_rect = pygame.Rect(col_index * TILE_SIZE, row_index * TILE_SIZE, TILE_SIZE, TILE_SIZE)
                     if self.rect.colliderect(tile_rect):  # Horizontal collision
                         if self.dx > 0:  # Moving right
                             self.rect.right = tile_rect.left
                         elif self.dx < 0:  # Moving left
                             self.rect.left = tile_rect.right
-
-        # Prevent players from overlapping each other
-        if self.rect.colliderect(other_player.rect):
-            if self.dx > 0:  # Moving right
-                self.rect.right = other_player.rect.left
-            elif self.dx < 0:  # Moving left
-                self.rect.left = other_player.rect.right
-            elif self.dy > 0:
-                self.rect.bottom = other_player.rect.top
-            elif self.dy < 0:
-                self.rect.top = other_player.rect.bottom
+                if tile == "L":
+                    if self.rect.colliderect(tile_rect):  # Horizontal collision
+                        if self.dx > 0:  # Moving right
+                            self.rect.right = tile_rect.left
+                        elif self.dx < 0:  # Moving left
+                            self.rect.left = tile_rect.right
+                if tile == "O":
+                    if self.rect.colliderect(tile_rect):  # Horizontal collision
+                        if self.dx > 0:  # Moving right
+                            self.rect.right = tile_rect.left
+                        elif self.dx < 0:  # Moving left
+                            self.rect.left = tile_rect.right
+                if tile == "G":
+                    if self.rect.colliderect(tile_rect):  # Horizontal collision
+                        if self.dx > 0:  # Moving right
+                            self.rect.right = tile_rect.left
+                        elif self.dx < 0:  # Moving left
+                            self.rect.left = tile_rect.right
 
         # Diamond collection
         for diamond in diamonds:
@@ -223,16 +230,6 @@ class Player:
                 self.dy = 0
             elif self.dy < 0:  # Hitting cube from below
                 self.rect.top = cube.rect.bottom
-                self.dy = 0
-
-        # Prevent players from overlapping each other vertically
-        if self.rect.colliderect(other_player.rect):
-            if self.dy > 0:
-                self.rect.bottom = other_player.rect.top
-                self.on_ground = True
-                self.dy = 0
-            elif self.dy < 0:  # Hitting cube from below
-                self.rect.top = other_player.rect.bottom
                 self.dy = 0
 
         # Vertical collision (ground and liquid collisions)
@@ -272,7 +269,15 @@ class Player:
                             elif self.dy < 0:
                                 self.rect.top = hazard_rect.bottom
                                 self.dy = 0
-                        elif tile == "G":
+                        elif tile == "O" and self.element_type == "fireboy": # Fireboy can hit the bottom of the water
+                            if self.dy < 0:
+                                self.rect.top = hazard_rect.bottom
+                                self.dy = 0
+                        elif tile == "L" and self.element_type == "watergirl": #Watergirl can hit the bottom of the lava
+                            if self.dy < 0:
+                                self.rect.top = hazard_rect.bottom
+                                self.dy = 0
+                        elif tile == "G": #Both can hit the bottom of the green liquid
                             if self.dy < 0:
                                 self.rect.top = hazard_rect.bottom
                                 self.dy = 0
@@ -296,7 +301,14 @@ class Player:
                 if hazard_type == "L":  # Lava
                     if player_type == "fireboy":
                         return False  # Safe for Fireboy
-                    return True  # Watergirl dies
+                    else:
+                        if self.dy > 0:
+                            self.rect.bottom = hazard_rect.top
+                            self.dy = 0
+                            return True
+                        elif self.dy < 0:
+                            self.rect.top = hazard_rect.bottom
+                            self.dy = 0
                 elif hazard_type == "O":  # Water
                     if player_type == "watergirl":
                         return False  # Safe for Watergirl
@@ -508,8 +520,8 @@ def main():
                 sys.exit()
 
         # Update positions
-        fireboy.move(level, watergirl, cube, diamonds)
-        watergirl.move(level, fireboy, cube, diamonds)
+        fireboy.move(level, cube, diamonds)
+        watergirl.move(level, cube, diamonds)
 
         # Controls
         keys = pygame.key.get_pressed()
