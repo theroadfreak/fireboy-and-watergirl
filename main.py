@@ -82,7 +82,7 @@ def load_levels(filename):
 
 
 levels = load_levels("resources/levels.txt")
-current_level = 1
+current_level = 2
 
 # Draw level
 def draw_level(level, fireboy, watergirl, cube, diamonds):
