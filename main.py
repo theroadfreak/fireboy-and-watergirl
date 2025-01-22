@@ -1,25 +1,32 @@
 import pygame
 import sys
 
+from pygame.cursors import diamond
+
 # Initialize Pygame
 pygame.init()
+pygame.mixer.init()
 
 # Constants
 SCREEN_WIDTH, SCREEN_HEIGHT = 760, 580
 TILE_SIZE = 20
 FPS = 60
-FONT_COLOR = (255, 255, 255)
 
 # Colors
-FIRE_COLOR = (255, 0, 0)
-WATER_COLOR = (0, 0, 255)
-GROUND_COLOR = (200, 200, 200)
-WALL_COLOR = (120, 85, 50)
+FONT_COLOR = (255, 255, 255)
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+GRAY = (200, 200, 200)
+HOVER_COLOR = (150, 150, 150)
+
+# Fonts
+font = pygame.font.Font(None, 36)  # Default Pygame font
+large_font = pygame.font.Font(None, 72)
 
 # Physics constants
 GRAVITY = 0.3
 JUMP_HEIGHT_TILES = 4.5  # Desired jump height in tiles
-JUMP_STRENGTH = -(2 * GRAVITY * (JUMP_HEIGHT_TILES * TILE_SIZE))**0.5
+JUMP_STRENGTH = -(2 * GRAVITY * (JUMP_HEIGHT_TILES * TILE_SIZE)) ** 0.5
 TERMINAL_VELOCITY = 5
 
 # Load images
@@ -43,17 +50,19 @@ lever_orange_image = pygame.image.load("resources/pngs/lever_orange.png")
 lever_blue_image = pygame.image.load("resources/pngs/lever_blue.png")
 button_blue_image = pygame.image.load("resources/pngs/button_blue.png")
 button_orange_image = pygame.image.load("resources/pngs/button_orange.png")
+menu_background_image = pygame.image.load("resources/pngs/TempleHallForest_menu_background.jpg")
 
 # Scale images
-fireboy_image = pygame.transform.scale(fireboy_image, (35,50))
-watergirl_image = pygame.transform.scale(watergirl_image, (35,50))
+fireboy_image = pygame.transform.scale(fireboy_image, (35, 50))
+watergirl_image = pygame.transform.scale(watergirl_image, (35, 50))
 lava_image = pygame.transform.scale(lava_image, (5 * TILE_SIZE, TILE_SIZE))
 water_image = pygame.transform.scale(water_image, (5 * TILE_SIZE, TILE_SIZE))
 green_stuff_image = pygame.transform.scale(green_stuff_image, (5 * TILE_SIZE, TILE_SIZE))
-exit_fire_image = pygame.transform.scale(exit_fire_image, (2.5 * TILE_SIZE, 3 *TILE_SIZE))
-exit_water_image = pygame.transform.scale(exit_water_image, (2.5 * TILE_SIZE, 3 *TILE_SIZE))
+exit_fire_image = pygame.transform.scale(exit_fire_image, (2.5 * TILE_SIZE, 3 * TILE_SIZE))
+exit_water_image = pygame.transform.scale(exit_water_image, (2.5 * TILE_SIZE, 3 * TILE_SIZE))
 tile_image = pygame.transform.scale(tile_image, (TILE_SIZE, TILE_SIZE))
 background_image = pygame.transform.scale(background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
+menu_background_image = pygame.transform.scale(menu_background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
 blue_gem_image = pygame.transform.scale(blue_gem_image, (TILE_SIZE * 1.5, TILE_SIZE * 1.3))
 red_gem_image = pygame.transform.scale(red_gem_image, (TILE_SIZE * 1.5, TILE_SIZE * 1.3))
 ramp_left_image = pygame.transform.scale(ramp_left_image, (TILE_SIZE, TILE_SIZE))
@@ -67,6 +76,25 @@ lever_orange_image = pygame.transform.scale(lever_orange_image, (2 * TILE_SIZE, 
 lever_blue_image = pygame.transform.scale(lever_blue_image, (2 * TILE_SIZE, 2 * TILE_SIZE))
 button_blue_image = pygame.transform.scale(button_blue_image, (2 * TILE_SIZE, TILE_SIZE))
 button_orange_image = pygame.transform.scale(button_orange_image, (2 * TILE_SIZE, TILE_SIZE))
+
+# Sounds
+menu_music = pygame.mixer.Sound("resources/music/menu_music.mp3")
+level_music = pygame.mixer.Sound("resources/music/level_music.mp3")
+level_over_sound = pygame.mixer.Sound("resources/music/level_music_over.mp3")
+level_finish_sound = pygame.mixer.Sound("resources/music/level_music_finish.mp3")
+death_sound = pygame.mixer.Sound("resources/music/death.mp3")
+diamond_collect_sound = pygame.mixer.Sound("resources/music/diamond.mp3")
+fireboy_jump_sound = pygame.mixer.Sound("resources/music/jump_fireboy.mp3")
+watergirl_jump_sound = pygame.mixer.Sound("resources/music/jump_watergirl.mp3")
+
+menu_music.set_volume(0.5)
+level_music.set_volume(0.5)
+level_finish_sound.set_volume(0.5)
+level_over_sound.set_volume(0.5)
+death_sound.set_volume(0.5)
+diamond_collect_sound.set_volume(0.5)
+fireboy_jump_sound.set_volume(0.5)
+watergirl_jump_sound.set_volume(0.5)
 
 # Create game screen
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -82,7 +110,7 @@ def load_levels(filename):
 
 
 levels = load_levels("resources/levels.txt")
-current_level = 2
+
 
 # Draw level
 def draw_level(level, fireboy, watergirl, cube, diamonds):
@@ -95,7 +123,10 @@ def draw_level(level, fireboy, watergirl, cube, diamonds):
             y = row_index * TILE_SIZE
 
             if tile == "#":
-                screen.blit(tile_image, (x, y))
+                transparent_tile = tile_image.copy()  # Copy the original tile image
+                transparent_tile.set_alpha(160)  # Set transparency (0 = fully transparent, 255 = fully opaque)
+
+                screen.blit(transparent_tile, (x, y))
             elif tile == "F":
                 if fireboy.x == 0 and fireboy.y == 0:
                     fireboy.x = x
@@ -131,9 +162,15 @@ def draw_level(level, fireboy, watergirl, cube, diamonds):
                 if not any(diamond.rect.topleft == (x - 5, y) for diamond in diamonds):
                     diamonds.append(Diamond(x - 5, y, blue_gem_image, "blue"))
             elif tile == "/":
-                screen.blit(ramp_right_image, (x, y))
+                transparent_ramp_right = ramp_right_image.copy()
+                transparent_ramp_right.set_alpha(160)
+
+                screen.blit(transparent_ramp_right, (x, y))
             elif tile == "\\":
-                screen.blit(ramp_left_image, (x, y))
+                transparent_ramp_left = ramp_left_image.copy()
+                transparent_ramp_left.set_alpha(160)
+
+                screen.blit(transparent_ramp_left, (x, y))
             elif tile == "*":
                 screen.blit(ramp_right_rotated_image, (x, y))
             elif tile == "-":
@@ -149,6 +186,79 @@ def draw_level(level, fireboy, watergirl, cube, diamonds):
 
             col_index += 1
     return hazard_positions, diamonds
+
+
+# Button class
+class MenuButton:
+    def __init__(self, text, x, y, width, height, callback):
+        self.text = text
+        self.rect = pygame.Rect(x, y, width, height)
+        self.color = GRAY
+        self.callback = callback
+
+    def draw(self, screen):
+        pygame.draw.rect(screen, self.color, self.rect)
+        pygame.draw.rect(screen, BLACK, self.rect, 2)  # Border
+        text_surface = font.render(self.text, True, BLACK)
+        text_rect = text_surface.get_rect(center=self.rect.center)
+        screen.blit(text_surface, text_rect)
+
+    def check_click(self, pos):
+        if self.rect.collidepoint(pos):
+            self.callback()
+
+
+# Menu screen function
+def menu_screen():
+    """Displays the menu screen with level selection."""
+    # Create buttons for each level
+    buttons = []
+    button_width = 200
+    button_height = 50
+    button_spacing = 20
+    start_y = (SCREEN_HEIGHT - (len(levels) * (button_height + button_spacing))) // 2
+
+    for i, level in enumerate(levels):
+        x = (SCREEN_WIDTH - button_width) // 2
+        y = start_y + i * (button_height + button_spacing)
+        buttons.append(
+            MenuButton("Level " + str(i + 1), x, y, button_width, button_height, lambda l=level: load_level(l)))
+
+    menu_music.play(-1)
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_pos = event.pos
+                for button in buttons:
+                    button.check_click(mouse_pos)
+
+        screen.blit(menu_background_image, (0, 0))
+        # Draw title
+        title = large_font.render("Select a Level", True, WHITE)
+        title_rect = title.get_rect(center=(SCREEN_WIDTH // 2, 100))
+        screen.blit(title, title_rect)
+
+        # Draw buttons
+        for button in buttons:
+            # Change button color on hover
+            if button.rect.collidepoint(pygame.mouse.get_pos()):
+                button.color = HOVER_COLOR
+            else:
+                button.color = GRAY
+            button.draw(screen)
+
+        pygame.display.flip()
+
+
+# Load level function
+def load_level(level_name):
+    """Loads the selected level."""
+    main_game(level_name)
 
 
 class Player:
@@ -211,9 +321,11 @@ class Player:
                 if diamond.diamond_type == "red" and self.element_type == "fireboy":
                     diamond.collected = True
                     self.score += 10  # Add to score
+                    diamond_collect_sound.play()
                 elif diamond.diamond_type == "blue" and self.element_type == "watergirl":
                     diamond.collected = True
                     self.score += 10
+                    diamond_collect_sound.play()
 
         # Apply gravity and vertical movement
         self.dy += GRAVITY
@@ -269,24 +381,22 @@ class Player:
                             elif self.dy < 0:
                                 self.rect.top = hazard_rect.bottom
                                 self.dy = 0
-                        elif tile == "O" and self.element_type == "fireboy": # Fireboy can hit the bottom of the water
+                        elif tile == "O" and self.element_type == "fireboy":  # Fireboy can hit the bottom of the water
                             if self.dy < 0:
                                 self.rect.top = hazard_rect.bottom
                                 self.dy = 0
-                        elif tile == "L" and self.element_type == "watergirl": #Watergirl can hit the bottom of the lava
+                        elif tile == "L" and self.element_type == "watergirl":  # Watergirl can hit the bottom of the lava
                             if self.dy < 0:
                                 self.rect.top = hazard_rect.bottom
                                 self.dy = 0
-                        elif tile == "G": #Both can hit the bottom of the green liquid
+                        elif tile == "G":  # Both can hit the bottom of the green liquid
                             if self.dy < 0:
                                 self.rect.top = hazard_rect.bottom
                                 self.dy = 0
                     col_index += 4  # Skip the next 4 tiles since we handled the full width
                 col_index += 1
 
-
         return self.on_ground
-
 
     def jump(self):
         """Make the player jump."""
@@ -426,6 +536,7 @@ class Cube:
         # Draw the image at the player's position
         screen.blit(self.image, (self.rect.x, self.rect.y))
 
+
 class Diamond:
     def __init__(self, x, y, image, diamond_type):
         self.rect = pygame.Rect(x, y, TILE_SIZE, TILE_SIZE)
@@ -464,6 +575,7 @@ class Platform:
     def draw(self, screen):
         screen.blit(self.image, (self.rect.x, self.rect.y))
 
+
 class Lever:
     def __init__(self, x, y, width, height, image, linked_platforms):
         self.rect = pygame.Rect(x, y, width, height)
@@ -478,6 +590,7 @@ class Lever:
 
     def draw(self, screen):
         screen.blit(self.image, (self.rect.x, self.rect.y))
+
 
 class Button:
     def __init__(self, x, y, width, height, image, linked_platforms):
@@ -496,12 +609,10 @@ class Button:
 
 
 # Main game loop
-def main():
-    global current_level
+def main_game(level):
     fireboy = Player(0, 0, 35, 50, fireboy_image, "fireboy")
     watergirl = Player(0, 0, 35, 50, watergirl_image, "watergirl")
     cube = Cube(0, 0, 2 * TILE_SIZE, 2 * TILE_SIZE, cube_image)
-    level = levels[current_level]
     platform_blue = Platform(0, 0, 4 * TILE_SIZE, TILE_SIZE, platform_blue_image, 100, 2)
     platform_orange = Platform(0, 0, 4 * TILE_SIZE, TILE_SIZE, platform_orange_image, 100, 2)
 
@@ -509,7 +620,10 @@ def main():
     watergirl_speed = 4
 
     diamonds = []
-    hazard_positions, diamonds= draw_level(level, fireboy.rect, watergirl.rect, cube.rect, diamonds)
+    hazard_positions, diamonds = draw_level(level, fireboy.rect, watergirl.rect, cube.rect, diamonds)
+
+    menu_music.stop()
+    level_music.play(-1)
 
     while True:
         screen.blit(background_image, (0, 0))  # Draw the background image
@@ -534,6 +648,7 @@ def main():
         if keys[pygame.K_RIGHT]:
             fireboy.dx = fireboy_speed
         if keys[pygame.K_UP] and fireboy.on_ground:  # Jump if on ground
+            fireboy_jump_sound.play()
             fireboy.jump()
 
         # Watergirl movement
@@ -542,16 +657,24 @@ def main():
         if keys[pygame.K_d]:
             watergirl.dx = watergirl_speed
         if keys[pygame.K_w] and watergirl.on_ground:  # Jump if on ground
+            watergirl_jump_sound.play()
             watergirl.jump()
-
 
         # Check for hazards
         if fireboy.check_hazards(hazard_positions, "fireboy"):
-            print("Fireboy died!")
-            return
+            level_music.stop()
+            death_sound.play()
+            pygame.time.wait(int(death_sound.get_length() * 1000))
+            level_over_sound.play()
+            pygame.time.wait(int(level_over_sound.get_length() * 500))
+            menu_screen()
         if watergirl.check_hazards(hazard_positions, "watergirl"):
-            print("Watergirl died!")
-            return
+            level_music.stop()
+            death_sound.play()
+            pygame.time.wait(int(death_sound.get_length() * 1000))
+            level_over_sound.play()
+            pygame.time.wait(int(level_over_sound.get_length() * 500))
+            menu_screen()
 
         # Draw everything
         fireboy.draw(screen)
@@ -563,6 +686,7 @@ def main():
         pygame.display.flip()
         clock.tick(FPS)
 
+
 # Start the game
 if __name__ == "__main__":
-    main()
+    menu_screen()
