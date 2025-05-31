@@ -68,6 +68,8 @@ python main.py
   - WASD keys for movement
   - W to jump
 
+- Use E to interact with levers
+
 ## Contributors 
 Nikola Serafimov - serafimovnikola582@gmail.com
 
